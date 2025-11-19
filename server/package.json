@@ -12,7 +12,11 @@
   "type": "commonjs",
   "dependencies": {
     "cookie-parser": "^1.4.7",
+    "cookies-parser": "^1.2.0",
     "cors": "^2.8.5",
     "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
   }
 }
