@@ -16,8 +16,6 @@ app.use('/api', router);
 
 const start = async () => {
     try {
-        console.log('cw cwcwc')
-        // await db.connect();
         app.listen(PORT, () => console.log(`Server started on port = ${PORT}`))
 
     } catch (e){
