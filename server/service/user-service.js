@@ -1,26 +1,39 @@
 const pool = require('../db');
 const bcrypt = require('bcrypt');
 const smsService = require('./sms-service');
+const tokenService = require('./token-service');
+const UserDto = require('../dtos/user-dto');
+const ErrorModel = require('../dtos/error-dto');
 
 class UserService {
 //Регистрация пользователя в БД
     async registration(phoneNumber, password) {
         if (await this.isExistingUser(phoneNumber)) {
-            throw new Error(`Пользователь с номером ${phoneNumber} уже существует`);
+            console.log(`Пользователь с номером ${phoneNumber} уже существует`);
+            return `Пользователь с номером ${phoneNumber} уже существует`
         }
+
+        const hashPassword = await bcrypt.hash(password, 3); // Соль нужно вынести куда-то в конфиг
+
+        console.log('Hashed password:', hashPassword);
 
         const code = this.#generateCode();
 
-        console.log('Registering user with phone number:', phoneNumber);
-        const hashedPassword = await bcrypt.hash(password, 10);
-
         try {
             await smsService.send(phoneNumber, `Ваш код подтверждения: ${code}`);
+            console.log('Sending SMS to', phoneNumber, 'with code:', code);
+            const result = await pool.query(
+                'INSERT INTO users (phone_number, is_activated, activated_code, password) VALUES ($1, $2, $3, $4) RETURNING *',
+                [String(phoneNumber), false, String(code), String(hashPassword)]);
 
-            const user = await pool.query(
-                'INSERT INTO users (phone_number, is_activated, activated_code) VALUES ($1, $2, $3) RETURNING *',
-                [phoneNumber, false, code]
-        );
+            const userDto = new UserDto({
+                                            phone: String(result[0].phone), 
+                                            id: result[0].id, 
+                                            isActivated: result[0].isActivated
+                                        });
+            const tokens = tokenService.generateTokens(userDto)
+            tokenService.saveToken(userDto.id, tokens.refreshToken)
+            return { ...tokens, user: userDto }
         } catch (error) {
             console.error('Error during user registration:', error);
         }
@@ -41,6 +54,46 @@ class UserService {
 
         return result;
     }
+    async logIn(phoneNumber, password) {
+        if (!await this.isExistingUser(phoneNumber)) {
+            return `Пользователь с номером ${phoneNumber} не существует`
+        }
+
+        const hashPassword = await bcrypt.hash(password, 3);
+
+        console.log(`PhoneNumber ${phoneNumber} \n hashPassword ${hashPassword}`);
+        const result = await pool.query(
+            'SELECT * FROM users WHERE phone_number = $1',
+            [phoneNumber]
+        );
+
+        if (result.rows.length === 0) {
+            return Error('Invalid phone number or password');
+        }
+
+        const user = result.rows[0];
+
+        const isPasswordValid = await bcrypt.compare(String(password), String(hashPassword))
+
+
+        if (!isPasswordValid) {
+            console.log('Неверный пароль')
+            return new ErrorModel({
+                errorMessage: 'Неверный пароль'
+            })
+        }
+        console.log('Пароль верный')
+        const userDto = new UserDto({
+                                        phone: String(user.phone_number),
+                                        id: user.id,     
+                                        isActivated: user.is_activated
+                                    });
+        const tokens = tokenService.generateTokens(userDto)
+        console.log(tokens);
+        tokenService.saveToken(userDto.id, tokens.refreshToken)
+        return { ...tokens, user: userDto }
+    }
+
 //Обновление статуса активации пользователя по id пользователя
     async updateUserActivation(userId, isActivated) {
         try {
@@ -54,6 +107,16 @@ class UserService {
         } catch (error) {
             console.error('Error updating user activation:', error);
             return "Ошибка при обновлении активации пользователя";
+        }
+    }
+// получение всех пользователей в системе
+
+    async getAllUsers() {
+        try {
+            const result = await pool.query('SELECT * FROM users');
+        return result.rows;
+        } catch (error) {
+            return `Не удалось получить список пользователей: ${error.message}`;
         }
     }
 

@@ -4,23 +4,30 @@ class UserController {
     async registration(req, res, next) {
         try {
             console.log('Received registration request with data:', req.body);
-            userService.registration(req.body.phoneNumber, req.body.password)
+            const result = await userService.registration(req.body.phoneNumber, req.body.password)
+            console.log(result);
+            res.json(result);
         } catch (error) {
+            res.json(error)
             console.error('Error during registration:', error);
         }
     }
 
     async login(req, res, next) {
         try {
-        
+            console.log('viruebvnerverv');
+            console.log(req.body);
+            const result = await userService.logIn(req.body.phoneNumber, req.body.password);
+            res.json(result)
         } catch (error) {
-        
+            console.log(error);
+            res.json(error);
         }
     }
 
     async logout(req, res, next) {
         try {
-        
+            
         } catch (error) {
         
         }
@@ -51,9 +58,10 @@ class UserController {
 
     async getUsers(req, res, next) {
         try {
-            res.json(['user1', 'user2']);
+            const result = await userService.getAllUsers();
+            res.json(result);
         } catch (error) {
-            res.json('virenvenv')
+            res.json(error)
         }
     }
 }
