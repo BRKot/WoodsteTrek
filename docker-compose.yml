@@ -1,0 +1,32 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: ./server
+    container_name: wooster_app
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./server/.env
+    depends_on:
+      - db
+    restart: always
+    volumes:
+      - ./server:/app
+
+  db:
+    image: postgres:15
+    container_name: wooster_db
+    environment:
+      POSTGRES_USER: brkot
+      POSTGRES_PASSWORD: Return0!
+      POSTGRES_DB: DataBase
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: always
+
+volumes:
+  postgres_data:
