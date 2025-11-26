@@ -4,7 +4,10 @@ class UserController {
     async registration(req, res, next) {
         try {
             console.log('Received registration request with data:', req.body);
-            const result = await userService.registration(req.body.phoneNumber, req.body.password)
+            const result = await userService.registration(req.body.phoneNumber, 
+                                                            req.body.password,
+                                                            req.body.role,
+                                                            req.body.sudivision)
             console.log(result);
             res.json(result);
         } catch (error) {
@@ -50,9 +53,12 @@ class UserController {
 
     async refresh(req, res, next) {
         try {
-        
+            console.log(req.body);
+            const result = await userService.refreshToken(req.body.refresh_token);
+            res.json(result)
         } catch (error) {
-        
+            console.log(error);
+            res.json(error);
         }
     }
 

@@ -4,10 +4,11 @@ const smsService = require('./sms-service');
 const tokenService = require('./token-service');
 const UserDto = require('../dtos/user-dto');
 const ErrorModel = require('../dtos/error-dto');
+const { TokenExpiredError } = require('jsonwebtoken');
 
 class UserService {
 //Регистрация пользователя в БД
-    async registration(phoneNumber, password) {
+    async registration(phoneNumber, password, role, subdivision) {
         if (await this.isExistingUser(phoneNumber)) {
             console.log(`Пользователь с номером ${phoneNumber} уже существует`);
             return `Пользователь с номером ${phoneNumber} уже существует`
@@ -23,8 +24,8 @@ class UserService {
             await smsService.send(phoneNumber, `Ваш код подтверждения: ${code}`);
             console.log('Sending SMS to', phoneNumber, 'with code:', code);
             const result = await pool.query(
-                'INSERT INTO users (phone_number, is_activated, activated_code, password) VALUES ($1, $2, $3, $4) RETURNING *',
-                [String(phoneNumber), false, String(code), String(hashPassword)]);
+                'INSERT INTO users (phone_number, is_activated, activated_code, password, role, subdivision) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+                [String(phoneNumber), false, String(code), String(hashPassword), role, subdivision]);
 
             const userDto = new UserDto({
                                             phone: String(result[0].phone), 
@@ -54,6 +55,7 @@ class UserService {
 
         return result;
     }
+//Авторизация пользователя
     async logIn(phoneNumber, password) {
         if (!await this.isExistingUser(phoneNumber)) {
             return `Пользователь с номером ${phoneNumber} не существует`
@@ -86,12 +88,66 @@ class UserService {
         const userDto = new UserDto({
                                         phone: String(user.phone_number),
                                         id: user.id,     
-                                        isActivated: user.is_activated
+                                        isActivated: user.is_activated,
+                                        role: user.role,
+                                        subdivision: user.subdivision
                                     });
         const tokens = tokenService.generateTokens(userDto)
         console.log(tokens);
         tokenService.saveToken(userDto.id, tokens.refreshToken)
-        return { ...tokens, user: userDto }
+        return { ...tokens, userInfo: userDto }
+    }
+//Обновление токена по refreshToken
+    async refreshToken(refreshToken) {
+        console.log(`refresh token: ${refreshToken}`);
+
+        try {
+            const tokenRow = (await pool.query(
+                'SELECT user_id FROM tokens WHERE refresh_token = $1',
+                [refreshToken]
+            )).rows[0];
+
+            if (!tokenRow) {
+                return { code: 400, message: "Такого токена нет" };
+            }
+
+            const user = (await pool.query(
+                'SELECT * FROM users WHERE id = $1',
+                [tokenRow.user_id]
+            )).rows[0];
+            console.log(user);
+            if (!user) {
+                return { code: 400, message: "Пользователь не найден" };
+            }
+
+            const userDto = new UserDto({
+                phone: String(user.phone_number),
+                id: user.id,
+                isActivated: user.is_activated,
+                role: user.role,
+                subdivision: user.subdivision
+            });
+
+            const tokens = tokenService.generateTokens(userDto);
+
+            await tokenService.saveToken(userDto.id, tokens.refreshToken);
+
+            return { ...tokens, userInfo: userDto };
+
+    } catch (error) {
+        return { code: 500, message: error?.message };
+    }
+}
+
+    async logOut(userId) {
+        try {
+            const result = await pool.query(
+                'DELETE FROM tokens WHERE user_id = $1',
+                [userId]
+            )
+        } catch (error) {
+            return {code: 500, error: error.message}
+        }
     }
 
 //Обновление статуса активации пользователя по id пользователя

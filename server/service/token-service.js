@@ -14,7 +14,6 @@ class TokenService {
     }
 
     async saveToken(userId, refreshToken) {
-        console.log('Сохраняем пароль');
         try {
             const tokenData = await pool.query(
             'SELECT * FROM tokens WHERE user_id = $1',
@@ -31,7 +30,8 @@ class TokenService {
         const result = await pool.query (
             'INSERT INTO tokens (user_id, refresh_token) VALUES ($1, $2) RETURNING *',
             [parseInt(userId), String(refreshToken)]);
-        console.log(result);    
+        console.log(result);
+        console.log('Сохраняем токен');    
         return result
         } catch (error) {
             console.log(error);
