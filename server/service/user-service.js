@@ -11,7 +11,7 @@ class UserService {
     async registration(phoneNumber, password, role, subdivision) {
         if (await this.isExistingUser(phoneNumber)) {
             console.log(`Пользователь с номером ${phoneNumber} уже существует`);
-            return `Пользователь с номером ${phoneNumber} уже существует`
+            return {message: `Пользователь с номером ${phoneNumber} уже существует`}
         }
 
         const hashPassword = await bcrypt.hash(password, 3); // Соль нужно вынести куда-то в конфиг
